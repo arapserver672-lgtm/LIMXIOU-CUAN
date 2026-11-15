@@ -2,32 +2,19 @@
 import { tg } from '../lib/telegram.js';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, method: 'POST required' });
-  }
-
-  if (
-    !process.env.SETUP_SECRET ||
-    req.headers['x-setup-secret'] !== process.env.SETUP_SECRET
-  ) {
-    return res.status(401).json({ ok: false });
+  if (req.method !== 'GET') {
+    return res.status(405).json({ ok: false });
   }
 
   const base = String(process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
   const secret = String(process.env.WEBHOOK_SECRET || '');
 
   if (!base || !secret) {
-    return res.status(400).json({
-      ok: false,
-      error: 'PUBLIC_BASE_URL and WEBHOOK_SECRET are required'
-    });
+    return res.status(400).json({ ok: false, error: 'Missing configuration' });
   }
 
   if (!/^[A-Za-z0-9_-]{1,256}$/.test(secret)) {
-    return res.status(400).json({
-      ok: false,
-      error: 'WEBHOOK_SECRET format is invalid'
-    });
+    return res.status(400).json({ ok: false, error: 'Invalid secret format' });
   }
 
   try {
@@ -40,14 +27,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
+      message: 'Webhook berhasil dipasang',
       result,
       webhook: `${base}/api/webhook`
     });
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({
-      ok: false,
-      error: e.message
-    });
+    return res.status(500).json({ ok: false, error: e.message });
   }
 }

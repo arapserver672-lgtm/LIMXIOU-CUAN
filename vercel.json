@@ -1,5 +1,15 @@
+
 {
   "version": 2,
-  "functions": { "api/webhook.js": { "maxDuration": 10 } },
-  "rewrites": [{ "source": "/api/webhook", "destination": "/api/webhook.js" }]
+  "functions": {
+    "api/webhook.mjs": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/webhook",
+      "destination": "/api/webhook.mjs"
+    }
+  ]
 }

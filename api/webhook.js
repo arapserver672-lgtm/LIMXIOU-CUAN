@@ -1,4 +1,3 @@
-
 import { q, withTx } from '../lib/db.js';
 import { tg, send, answer } from '../lib/telegram.js';
 import { TASK_RATES, calculateTaskBudget, rupiah } from '../lib/task-rates.js';
@@ -651,6 +650,7 @@ User: <code>${mask(id)}</code> terdeteksi menggunakan ulang bukti tugas.`);
   }
 
   await send(chat, 'Input tidak dikenali. Gunakan /cancel lalu mulai lagi.', menu(id));
+}
 
 async function onCallback(c) {
   const id = c.from.id;

@@ -1337,12 +1337,11 @@ async function onCallback(c) {
   `User: ${mask(out.user_id)}\n` +
   `Nominal deposit: ${money(out.amount)}\n` +
   `Metode: ${esc(out.method || '-')}`
-); user ${mask(out.user_id)} telah diverifikasi admin.`);
-    } else {
-      await editAdminAction(c,`ℹ️ <b>DEPOSIT #${n} SUDAH DIPROSES / TIDAK DITEMUKAN</b>`);
-    }
-    return;
-  }
+);
+} else {
+  await editAdminAction(c, `ℹ️ <b>DEPOSIT #${n} SUDAH DIPROSES / TIDAK DITEMUKAN</b>`);
+}
+return;
 
   if (data.startsWith('dep_no:') && isAdmin(id)) {
     const n = Number(data.split(':')[1]);

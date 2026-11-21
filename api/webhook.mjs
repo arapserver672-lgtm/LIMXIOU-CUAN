@@ -1294,8 +1294,26 @@ async function onCallback(c) {
     return;
   }
 
-  // Approve deposit
-  if (data.startsWith('dep_ok:') && isAdmin(id)) {
+      if (out) {
+      await send(
+        out.user_id,
+        `✅ Deposit #${n} disetujui. Saldo bertambah ${money(out.amount)}.`
+      );
+
+      await editAdminAction(c, `✅ <b>DEPOSIT #${n} DISETUJUI</b>\nSaldo ${money(out.amount)} telah dikreditkan ke user <code>${out.user_id}</code>.`);
+
+      await channelPost(
+        `✅ <b>DEPOSIT BERHASIL</b>\n` +
+        `User: ${mask(out.user_id)}\n` +
+        `Nominal deposit: ${money(out.amount)}\n` +
+        `Metode: ${esc(out.method || '-')}`
+      );
+    } else {
+      await editAdminAction(c, `ℹ️ <b>DEPOSIT #${n} SUDAH DIPROSES / TIDAK DITEMUKAN</b>`);
+    }
+
+    return;
+}
     const n = Number(data.split(':')[1]);
 
     const out = await withTx(async tx => {
@@ -1373,19 +1391,51 @@ return;
     return;
   }
 
-  // Admin konfirmasi transfer benar-benar selesai
-  if (data.startsWith('wd_done:') && isAdmin(id)) {
+    // Setujui WD: belum dianggap selesai
+  if (data.startsWith('wd_ok:') && isAdmin(id)) {
     const n = Number(data.split(':')[1]);
 
-    const r = await withTx(tx => tx(`UPDATE withdrawals SET status='completed',completed_at=NOW() WHERE id=$1 AND status='approved' RETURNING user_id,net_amount,channel_message_id`,[n]));
+    const r = await withTx(tx => tx(`
+      UPDATE withdrawals
+      SET status='approved',reviewed_at=NOW()
+      WHERE id=$1 AND status='pending'
+      RETURNING user_id,net_amount,phone,method
+    `, [n]));
+
     if (r.rows[0]) {
-      await send(r.rows[0].user_id,`✅ WD #${n} selesai. Transfer ${money(r.rows[0].net_amount)} telah dikonfirmasi admin.`);
-      if (r.rows[0].channel_message_id) await tg('editMessageText',{chat_id:CHANNEL,message_id:r.rows[0].channel_message_id,text:`✅ <b>WD SELESAI</b>\nUser: ${mask(r.rows[0].user_id)}\nTransfer telah dikonfirmasi admin.`,parse_mode:'HTML'});
-      await editAdminAction(c,`✅ <b>WD #${n} SELESAI</b>`);
-    } else await editAdminAction(c,`ℹ️ <b>WD #${n} BELUM DISETUJUI / SUDAH SELESAI</b>`);
+      const x = r.rows[0];
+
+      const post = await channelPost(
+        `📤 <b>WD SEDANG DIPROSES</b>\n` +
+        `User: ${mask(x.user_id)}\n` +
+        `Nominal transfer: ${money(x.net_amount)}\n` +
+        `Metode: ${esc(x.method || '-')}\n` +
+        `Nomor tujuan: ${mask(x.phone || '')}`
+      );
+
+      await q(
+        'UPDATE withdrawals SET channel_message_id=$1 WHERE id=$2',
+        [post.message_id, n]
+      );
+
+      await send(
+        x.user_id,
+        `WD #${n} disetujui. Transfer ${money(x.net_amount)} sedang diproses admin.`
+      );
+
+      await editAdminAction(
+        c,
+        `🟡 <b>WD #${n} DISETUJUI — MENUNGGU TRANSFER</b>`
+      );
+    } else {
+      await editAdminAction(
+        c,
+        `ℹ️ <b>WD #${n} SUDAH DIPROSES</b>`
+      );
+    }
+
     return;
   }
-
   // Tolak WD dan kembalikan saldo
   if (data.startsWith('wd_no:') && isAdmin(id)) {
     const n = Number(data.split(':')[1]);

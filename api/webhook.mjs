@@ -1,4 +1,3 @@
-
 import { q, withTx } from '../lib/db.js';
 import { tg, send, answer } from '../lib/telegram.js';
 import { TASK_RATES, calculateTaskBudget, rupiah } from '../lib/task-rates.js';
@@ -150,8 +149,12 @@ async function setting(key) {
 }
 
 async function saveSetting(key, value) {
-  await q(`INSERT INTO settings(key,value) VALUES($1,$2)
-    ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`, [key, String(value)]);
+  await q(`
+    INSERT INTO settings(key,value)
+    VALUES($1,$2)
+    ON CONFLICT(key)
+    DO UPDATE SET value=EXCLUDED.value
+  `, [key, String(value)]);
 }
 
 function mask(value) {
@@ -353,7 +356,10 @@ async function onMessage(m) {
 
     await send(
       chat,
-      '👋 <b>Selamat datang di LIMXIOCUAN</b>\n\nPilih layanan dari menu. Gunakan /cancel untuk membatalkan input.',
+      '👋 Selamat datang di LIMXIOCUAN心想事成\n\n' +
+'Platform freelance untuk mengerjakan tugas dan promosi konten TikTok.\n\n' +
+'💰 Kerjakan tugas, kumpulkan saldo, dan tarik penghasilanmu.\n' +
+'Silakan pilih layanan melalui menu di bawah.',
       menu(id)
     );
     return;
@@ -651,6 +657,7 @@ User: <code>${mask(id)}</code> terdeteksi menggunakan ulang bukti tugas.`);
   }
 
   await send(chat, 'Input tidak dikenali. Gunakan /cancel lalu mulai lagi.', menu(id));
+}
 
 async function onCallback(c) {
   const id = c.from.id;
@@ -940,15 +947,41 @@ async function onCallback(c) {
   }
 
   if (data === 'about') {
-    await send(
-      chat,
-      'LIMXIOCUAN adalah platform tugas dan reward.\n\n' +
-      'Developer: xiolim\n' +
-      'Deposit dan WD diperiksa admin secara manual.\n' +
-      'Reward tugas mengikuti tarif kategori.\n' +
-      'Biaya layanan pembuatan tugas sebesar 5%, bukan pajak pemerintah.'
-    );
-    return;
+  await send(
+    chat,
+    '<b>TENTANG LIMXIOCUAN心想事成</b>\n\n' +
+    'LIMXIOCUAN adalah bot freelance TikTok yang memungkinkan Anda:\n' +
+    '✅ Mengerjakan tugas\n' +
+    '✅ Membuat tugas untuk promosi konten TikTok\n' +
+    '✅ Mendapat bonus referral\n' +
+    '✅ Penarikan ke DANA, GoPay, OVO\n\n' +
+
+    '💵 <b>Rate Tugas:</b>\n' +
+    '• 👍 Like: Rp110\n' +
+    '• ♻️ Posting Ulang: Rp100\n' +
+    '• 👱 Follow: Rp1.300\n' +
+    '• 💬 Komentar: Rp700\n' +
+    '• 🗄️ Favorite: Rp550\n' +
+    '• 📎 Salin Tautan 10x: Rp350\n' +
+    '• 🤝 Bagikan ke 10 Teman: Rp900\n' +
+    '• 📎 Telegram: Rp750\n' +
+    '• 🪩 Channel: Rp500\n' +
+    '• 🪩 Group: Rp500\n' +
+    '• 💬 Whatsapp: Rp850\n\n' +
+
+    '📜 <b>Syarat & Ketentuan:</b>\n' +
+    '• Akun harus nama manusia, unsur nama orang Indonesia\n' +
+    '• Akun memiliki foto profil\n' +
+    '• Akun boleh baru atau lama\n\n' +
+
+    '<b>Peraturan:</b>\n' +
+    '• Tugas ditolak 5x = akun diblokir 24 jam & saldo di-reset Rp0\n' +
+    '• Setiap tugas hanya bisa dikerjakan 1x per user\n' +
+    '• Bukti kerja WAJIB screenshot, lalu menunggu ACC admin\n' +
+    '• Screenshot yang sama / palsu = BLACKLIST PERMANEN\n' +
+    '• Link harus valid (jenis khusus boleh TikTok / Telegram / WhatsApp). Slot: min 10 (Like & Posting Ulang min 50)'
+  );
+  return;
   }
 
   if (data === 'admin' && isAdmin(id)) {
@@ -1270,7 +1303,7 @@ async function onCallback(c) {
         UPDATE deposits
         SET status='approved',reviewed_at=NOW()
         WHERE id=$1 AND status='pending'
-        RETURNING user_id,amount
+        RETURNING user_id,amount,method
       `, [n]);
 
       if (!r.rows.length) return null;
@@ -1299,12 +1332,16 @@ async function onCallback(c) {
         `✅ Deposit #${n} disetujui. Saldo bertambah ${money(out.amount)}.`
       );
       await editAdminAction(c,`✅ <b>DEPOSIT #${n} DISETUJUI</b>\nSaldo ${money(out.amount)} telah dikreditkan ke user <code>${out.user_id}</code>.`);
-      await channelPost(`✅ Deposit user ${mask(out.user_id)} telah diverifikasi admin.`);
-    } else {
-      await editAdminAction(c,`ℹ️ <b>DEPOSIT #${n} SUDAH DIPROSES / TIDAK DITEMUKAN</b>`);
-    }
-    return;
-  }
+      await channelPost(
+  `✅ <b>DEPOSIT BERHASIL</b>\n` +
+  `User: ${mask(out.user_id)}\n` +
+  `Nominal deposit: ${money(out.amount)}\n` +
+  `Metode: ${esc(out.method || '-')}`
+);
+} else {
+  await editAdminAction(c, `ℹ️ <b>DEPOSIT #${n} SUDAH DIPROSES / TIDAK DITEMUKAN</b>`);
+}
+return;
 
   if (data.startsWith('dep_no:') && isAdmin(id)) {
     const n = Number(data.split(':')[1]);
@@ -1320,7 +1357,13 @@ async function onCallback(c) {
   if (data.startsWith('wd_ok:') && isAdmin(id)) {
     const n = Number(data.split(':')[1]);
 
-    const r = await withTx(tx => tx(`UPDATE withdrawals SET status='approved',reviewed_at=NOW() WHERE id=$1 AND status='pending' RETURNING user_id,net_amount,phone`,[n]));
+    const post = await channelPost(
+  `📤 <b>WD SEDANG DIPROSES</b>\n` +
+  `User: ${mask(r.rows[0].user_id)}\n` +
+  `Nominal transfer: ${money(r.rows[0].net_amount)}\n` +
+  `Metode: ${esc(r.rows[0].method || '-')}\n` +
+  `Nomor tujuan: ${mask(r.rows[0].phone || '')}`
+);
     if (r.rows[0]) {
       const post = await channelPost(`📤 <b>WD SEDANG DITRANSFER</b>\nUser: ${mask(r.rows[0].user_id)}\nMetode: ${esc(r.rows[0].method || '')}\nNomor tujuan: ${mask(r.rows[0].phone || '')}`);
       await q('UPDATE withdrawals SET channel_message_id=$1 WHERE id=$2',[post.message_id,n]);

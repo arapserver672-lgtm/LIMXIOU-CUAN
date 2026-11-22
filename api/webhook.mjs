@@ -1,7 +1,7 @@
-import { q, withTx } from '../lib/db.js';
-import { tg, send, answer } from '../lib/telegram.js';
-import { TASK_RATES, calculateTaskBudget, rupiah } from '../lib/task-rates.js';
-import { calculateDepositFee } from '../lib/deposit-fees.js';
+import { q, withTx } from '../lib/db.mjs';
+import { tg, send, answer } from '../lib/telegram.mjs';
+import { TASK_RATES, calculateTaskBudget, rupiah } from '../lib/task-rates.mjs';
+import { calculateDepositFee } from '../lib/deposit-fees.mjs';
 import { randomInt } from 'node:crypto';
 
 const ADMIN = String(process.env.ADMIN_ID || '');
